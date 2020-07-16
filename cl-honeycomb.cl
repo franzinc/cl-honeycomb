@@ -1,3 +1,10 @@
+;; See the file LICENSE for the full license governing this code.
+
+(sys:defpatch "cl-honeycomb" 0
+  "v0: initial release of cl-honeycomb implementation."
+   :type :system
+   :post-loadable t)
+
 (defpackage :cl-honeycomb
   (:use :cl :excl)
   (:export
@@ -453,3 +460,5 @@ Visualize the results in honeycomb and check the parent is linked to the childre
           (with-span ("child 2" "" :ht-2 ht)))))
     (funcall f)))
 |#
+
+(provide :cl-honeycomb)
