@@ -326,7 +326,8 @@
 
 (defun do-post-span-hierarchy-to-honeycomb (span)
   (let ((url (util.string:string+ "https://api.honeycomb.io/1/batch/" (span-dataset span)))
-        (headers `(("X-Honeycomb-Team" . ,(span-api-key span))))
+        (headers `(("X-Honeycomb-Team" . ,(span-api-key span))
+                   ("User-Agent" . "cl-honeycomb")))
         (spans-todo (list span)))
     (loop while spans-todo
         do (let ((body (with-output-to-string (*standard-output*)
