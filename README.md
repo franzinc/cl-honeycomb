@@ -171,7 +171,7 @@ matches to the enclosing span:
         (add-span-attributes :num-results (length results))
         (handle-results results)))
 
-# Macros `with-saved-context`, `with-restored-context`
+## Macros `with-saved-context`, `with-restored-context`
 Syntax:
 
     (with-saved-context-context ()
