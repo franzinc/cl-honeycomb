@@ -57,7 +57,7 @@ and is available for inspecting in the web interface instantly.
    - Macros `with-saved-context`, `with-restored-context`
    - Macros `with-saved-serialized-context`, `with-restored-serialized-context`
 
-# Variable `*include-honeycomb-code-p*`
+## Variable `*include-honeycomb-code-p*`
 
  - If true (the default), the macros expand into forms that collect and
    transmit annotations.
@@ -66,13 +66,13 @@ and is available for inspecting in the web interface instantly.
 This impacts the compilation (macro-expansion) of new code. Existing
 compiled code is not impacted.
 
-# Variable `*post-to-honeycomb-p*`
+## Variable `*post-to-honeycomb-p*`
 
  - If true (the default), span data is sent via HTTP to Honeycomb.
  - If false, spans are created, but the last step of sending them
    over is not done.
 
-# Variables `*global-api-key*`, `*local-api-key*`
+## Variables `*global-api-key*`, `*local-api-key*`
 Annotations are only created if an API key is set. Without an API key
 there is no way to send the annotations over to the Honeycomb endpoint.
 
@@ -94,7 +94,7 @@ There are two variables to cover two use cases:
 If the *local* value is set, it is used; otherwise the *global* value is
 used if it is set.
 
-# Variables `*global-dataset-name*`, `*local-dataset-name*`
+## Variables `*global-dataset-name*`, `*local-dataset-name*`
 The *dataset* is the name under which all annotations are collected.
 Its value is a string like `"production"`. There is no way in Honeycomb
 to create datasets; instead it will appear there as soon as the first
@@ -103,7 +103,7 @@ span in it is created. Like for the API key:
 * `*global-dataset-name*` is a *nonbindable* variable
 * `*local-dataset-name*` is a dynamic variable;
 
-# Macro `with-span`
+## Macro `with-span`
 Syntax:
 
     (with-span (component function &rest key-values)
@@ -144,7 +144,7 @@ key-value attributes of the span:
    Usually the spans are sent to Honeycomb once the top span has
    finished executing.
 
-# Macro `add-span-attributes`
+## Macro `add-span-attributes`
 Syntax:
 
     (add-span-attributes &rest key-values)
@@ -198,7 +198,7 @@ For example:
            (with-span (..)
              ..)))
 
-# Macros `with-saved-serialized-context`, `with-restored-serialized-context`
+## Macros `with-saved-serialized-context`, `with-restored-serialized-context`
 Syntax:
 
     (with-saved-serialized-context (context-str)
