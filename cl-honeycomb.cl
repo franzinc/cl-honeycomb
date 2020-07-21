@@ -1,7 +1,8 @@
 ;; See the file LICENSE for the full license governing this code.
 
-(sys:defpatch "cl-honeycomb" 0
-  "v0: initial release of cl-honeycomb implementation."
+(sys:defpatch "cl-honeycomb" 1
+  "v1: set User-Agent in request to api.honeycomb.io;
+v0: initial release of cl-honeycomb implementation."
    :type :system
    :post-loadable t)
 
@@ -326,7 +327,10 @@
 
 (defun do-post-span-hierarchy-to-honeycomb (span)
   (let ((url (util.string:string+ "https://api.honeycomb.io/1/batch/" (span-dataset span)))
-        (headers `(("X-Honeycomb-Team" . ,(span-api-key span))))
+        (headers `(("X-Honeycomb-Team" . ,(span-api-key span))
+                   ("User-Agent" . #.(format nil "cl-honeycomb (~a ~a)"
+                                             (lisp-implementation-type)
+                                             (lisp-implementation-version)))))
         (spans-todo (list span)))
     (loop while spans-todo
         do (let ((body (with-output-to-string (*standard-output*)
