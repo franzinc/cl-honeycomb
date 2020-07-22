@@ -32,7 +32,7 @@ asynchronous: there is a dedicate process for the HTTP traffic.
 Here's a small self-contained example:
 
     (use-package :cl-honeycomb)
-    (setf cl-honeycomb:*api-key* "...copy-from-honeycomb-account...")
+    (setf cl-honeycomb:*global-api-key* "...copy-from-honeycomb-account...")
     (cl-honeycomb:with-span ("component 1" "outer" :key-1 "val-1" :key-2 123)
       (sleep 1)
       (cl-honeycomb:with-span ("component 2" "inner" :count 27)
@@ -50,7 +50,7 @@ and is available for inspecting in the web interface instantly.
    - Variable `*post-to-honeycomb-p*`
  * Configuration:
    - Variables `*global-api-key*`, `*local-api-key*`
-   - Variables `*global-dataset-name*`, `*local-dataset-name*`
+   - Variables `*global-dataset*`, `*local-dataset*`
  * Annotations:
    - Macros `with-span`, `add-span-attributes`
  * Passing around annotation state:
@@ -94,14 +94,14 @@ There are two variables to cover two use cases:
 If the *local* value is set, it is used; otherwise the *global* value is
 used if it is set.
 
-## Variables `*global-dataset-name*`, `*local-dataset-name*`
+## Variables `*global-dataset*`, `*local-dataset*`
 The *dataset* is the name under which all annotations are collected.
 Its value is a string like `"production"`. There is no way in Honeycomb
 to create datasets; instead it will appear there as soon as the first
 span in it is created. Like for the API key:
 
-* `*global-dataset-name*` is a *nonbindable* variable
-* `*local-dataset-name*` is a dynamic variable;
+* `*global-dataset*` is a *nonbindable* variable
+* `*local-dataset*` is a dynamic variable;
 
 ## Macro `with-span`
 Syntax:
