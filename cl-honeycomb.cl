@@ -182,6 +182,7 @@ v0: initial release of cl-honeycomb implementation."
 ;;;
 
 (defmacro with-span ((component function &rest kv-args) &body body &environment env)
+  ;; Returns the values returned by BODY.
   (if* *include-honeycomb-code-p*
      then (setf kv-args (copy-list kv-args))
           (destructuring-bind (&key max-child-spans flush-to-server-p &allow-other-keys)
@@ -219,6 +220,7 @@ v0: initial release of cl-honeycomb implementation."
      else ()))
 
 (defun call-with-span (component function key-values func max-child-spans flush-to-server-p)
+  ;; Returns the values returned by FUNC.
   (declare (optimize speed (safety 0)) ;; This function should be fast
            (dynamic-extent func))
   ;; FUNC is nil for no body
@@ -228,18 +230,18 @@ v0: initial release of cl-honeycomb implementation."
       (let ((max-childs (span-max-child-spans parent)))
         (if* (and max-childs (<= (the fixnum max-childs) 0))
            then ;; Child limit reached: don't create a new span
-                (when func
-                  (funcall (the function func)))
-                (return-from call-with-span))))
+                (return-from call-with-span
+                  (when func
+                    (funcall (the function func)))))))
     (multiple-value-bind (api-key dataset)
         (if* parent
            then (values (span-api-key parent) (span-dataset parent))
            else (let ((api-key %api-key%)
                       (dataset %dataset%))
                   (if* (or (null api-key) (null dataset))
-                     then (when func
-                            (funcall (the function func)))
-                          (return-from call-with-span)
+                     then (return-from call-with-span
+                            (when func
+                              (funcall (the function func))))
                      else (values api-key dataset))))
       (let* ((curr-span (make-span :parent-id (when parent
                                                 (span-span-id parent))

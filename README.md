@@ -109,7 +109,9 @@ Syntax:
     (with-span (component function &rest key-values)
        &body body)
 
-This wraps *body* in the specified annotation.
+This wraps *body* in the specified annotation. This form returns
+the values returned by `body`.
+
 Use nesting to indicate subtasks, as shown in the example above.
 
 Both `component` and `function` must be strings. The component is
