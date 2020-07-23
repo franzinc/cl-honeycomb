@@ -1,7 +1,8 @@
 ;; See the file LICENSE for the full license governing this code.
 
-(sys:defpatch "cl-honeycomb" 1
-  "v1: set User-Agent in request to api.honeycomb.io;
+(sys:defpatch "cl-honeycomb" 2
+  "v2: fix call-with-span return value; ensure post-process is started;
+v1: set User-Agent in request to api.honeycomb.io;
 v0: initial release of cl-honeycomb implementation."
    :type :system
    :post-loadable t)
@@ -308,23 +309,29 @@ v0: initial release of cl-honeycomb implementation."
 
 (defvar-nonbindable *post-span-queue* (make-instance 'mp:queue))
 
+(defvar-nonbindable *post-process* nil)
+
+(defun ensure-post-process ()
+  (or *post-process*
+      ;; Process is created on demand for first span.
+      ;; Also in saved images the process needs to be recreated.
+      (let ((proc (mp:process-run-function "cl-honeycomb::*post-process*" #'post-process)))
+        (setf (mp::process-keeps-lisp-alive-p proc) nil)
+        (setf (mp::process-interruptible-p proc) nil)
+        (setf *post-process* proc))))
+
 (defun post-process ()
   (loop for span = (mp:dequeue *post-span-queue*
                                :wait t
                                :whostate "Waiting for span to send to Honeycomb")
       do (do-post-span-hierarchy-to-honeycomb span)))
 
-(defvar-nonbindable *post-process*
-    (let ((proc (mp:process-run-function "cl-honeycomb::*post-process*" #'post-process)))
-      (setf (mp::process-keeps-lisp-alive-p proc) nil)
-      (setf (mp::process-interruptible-p proc) nil)
-      proc))
-
 (defun post-span-hierarchy-to-honeycomb (span)
   (when (not *post-to-honeycomb-p*)
     (return-from post-span-hierarchy-to-honeycomb :*post-to-honeycomb*-false))
   (check-type (span-dataset span) string)
   (check-type (span-api-key span) string)
+  (ensure-post-process)
   (mp:enqueue *post-span-queue* span))
 
 (defun do-post-span-hierarchy-to-honeycomb (span)
