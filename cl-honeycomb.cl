@@ -12,6 +12,10 @@ v0: initial release of cl-honeycomb implementation."
   (:export
    ;; compilation switch:
    #:*include-honeycomb-code-p*
+   
+   ;; send data here with dataset appended
+   *honeycomb-server-uri*
+   
    ;; runtime switch:
    #:*post-to-honeycomb-p*
    ;; config:
@@ -37,13 +41,15 @@ v0: initial release of cl-honeycomb implementation."
 (defvar-nonbindable *global-dataset* "cl-honeycomb")
 (defvar *local-dataset* nil)
 
+(defvar *honeycomb-server-uri* "https://api.honeycomb.io/1/batch/")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (eval-when (compile load eval)
   (require :st-json)
   (require :aserve))
 
-;; https://docs.honeycomb.io/working-with-your-data/core-feature-guides/tracing/send-trace-data/#manual-tracing
+;; https://docs.honeycomb.io/getting-data-in/tracing/send-trace-data/#manual-tracing
 ;;
 ;; Include the following key/value pairs in your log events:
 ;;
@@ -335,7 +341,7 @@ v0: initial release of cl-honeycomb implementation."
   (mp:enqueue *post-span-queue* span))
 
 (defun do-post-span-hierarchy-to-honeycomb (span)
-  (let ((url (util.string:string+ "https://api.honeycomb.io/1/batch/" (span-dataset span)))
+  (let ((url (util.string:string+ *honeycomb-server-uri* (span-dataset span)))
         (headers `(("X-Honeycomb-Team" . ,(span-api-key span))
                    ("User-Agent" . #.(format nil "cl-honeycomb (~a ~a)"
                                              (lisp-implementation-type)
