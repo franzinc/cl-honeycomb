@@ -14,7 +14,7 @@ v0: initial release of cl-honeycomb implementation."
    #:*include-honeycomb-code-p*
    
    ;; send data here with dataset appended
-   *honeycomb-server-uri*
+   #:*honeycomb-server-uri*
    
    ;; runtime switch:
    #:*post-to-honeycomb-p*
