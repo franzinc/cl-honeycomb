@@ -12,10 +12,10 @@ v0: initial release of cl-honeycomb implementation."
   (:export
    ;; compilation switch:
    #:*include-honeycomb-code-p*
-   
+
    ;; send data here with dataset appended
    #:*honeycomb-server-uri*
-   
+
    ;; runtime switch:
    #:*post-to-honeycomb-p*
    ;; config:
@@ -41,6 +41,7 @@ v0: initial release of cl-honeycomb implementation."
 (defvar-nonbindable *global-dataset* "cl-honeycomb")
 (defvar *local-dataset* nil)
 
+;; The dataset name is added at the end
 (defvar *honeycomb-server-uri* "https://api.honeycomb.io/1/batch/")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -188,100 +189,112 @@ v0: initial release of cl-honeycomb implementation."
                 (funcall func))))))
 ;;;
 
-(defmacro with-span ((component function &rest kv-args) &body body &environment env)
+(defmacro with-gensyms (syms &body body)
+  `(let ,(mapcar (lambda (s)
+		   `(,s (gensym ,(format nil "~a-" (symbol-name s)))))
+                 syms)
+     ,@body))
+
+(defmacro with-span ((component function &rest kv-args) &body body)
   ;; Returns the values returned by BODY.
   (if* *include-honeycomb-code-p*
      then (setf kv-args (copy-list kv-args))
           (destructuring-bind (&key max-child-spans flush-to-server-p &allow-other-keys)
               kv-args
             (when max-child-spans
-              (check-type max-child-spans (integer 0 #.most-positive-fixnum))
-              (remf kv-args :max-child-spans))
-            (when flush-to-server-p
-              (remf kv-args :flush-to-server-p))
-            `(call-with-span ,component
-                             ,function
-                             (list ,@(loop for x in kv-args
-                                         collect (if* (stringp x)
-                                                    then x
-                                                  elseif (constantp x env)
-                                                    then (prin1-to-string x)
-                                                    else `(prin1-to-string ,x))))
-                             ,(when body `(lambda () ,@body))
-                             ,max-child-spans
-                             ,flush-to-server-p))
+              (check-type max-child-spans (integer 0 #.most-positive-fixnum)))
+            (with-gensyms (gbody-func gargs gapi-key gdataset gparent)
+              `(let ((,gbody-func ,(when body `(lambda () ,@body))))
+                 (declare (dynamic-extent ,gbody-func))
+                 (multiple-value-bind (,gapi-key ,gdataset ,gparent)
+                     (add-span-p)
+                   (if* ,gapi-key
+                      then (let ((,gargs (list ,@kv-args)))
+                             (declare (dynamic-extent ,gargs))
+                             (call-with-span ,component
+                                             ,function
+                                             ,gargs
+                                             ,gbody-func
+                                             ,max-child-spans
+                                             ,flush-to-server-p
+                                             ,gapi-key
+                                             ,gdataset
+                                             ,gparent))
+                      else (when ,gbody-func
+                             (funcall (the function ,gbody-func))))))))
      else `(progn ,@body)))
 
-(defmacro add-span-attributes (&rest kv-args &environment env)
+(defun add-span-p ()
+  ;; Returns API-KEY, DATASET, PARENT on success;
+  ;; first value is nil on failure.
+  (declare (optimize speed (safety 0)))
+  (let ((parent *current-span*)
+        api-key
+        dataset)
+    (if* parent
+       then (setf api-key (span-api-key parent)
+                  dataset (span-dataset parent))
+            (when (span-max-child-spans parent)
+              (if* (plusp (the fixnum (span-max-child-spans parent)))
+                 then (decf (the fixnum (span-max-child-spans parent)))
+                 else (return-from add-span-p nil)))
+         else (setf api-key %api-key%
+                    dataset %dataset%))
+    (values (and dataset api-key)
+            dataset
+            parent)))
+
+(defmacro add-span-attributes (&rest kv-args)
   (if* *include-honeycomb-code-p*
      then `(when (honeycomb-enabled-p)
              (setf (span-key-values (or *current-span*
                                         (error "ADD-SPAN-ATTRIBUTES must be called inside WITH-SPAN")))
-               (list* ,@(loop for x in kv-args
-                            collect (if* (stringp x)
-                                       then x
-                                     elseif (constantp x env)
-                                       then (prin1-to-string x)
-                                       else `(prin1-to-string ,x)))
+               (nconc (mapcar #'arg-to-string (list ,@kv-args))
                       (span-key-values *current-span*))))
      else ()))
 
-(defun call-with-span (component function key-values func max-child-spans flush-to-server-p)
-  ;; Returns the values returned by FUNC.
-  (declare (optimize speed (safety 0)) ;; This function should be fast
-           (dynamic-extent func))
-  ;; FUNC is nil for no body
-  (let ((parent *current-span*))
+(defun arg-to-string (x)
+  (declare (optimize speed (safety 0)))
+  (typecase x
+    (symbol (symbol-name x))
+    (string x)
+    (t (prin1-to-string x))))
+
+(defun call-with-span (component function key-values body-func max-child-spans flush-to-server-p
+                       api-key dataset parent)
+  ;; BODY-FUNC is nil for no body.
+  ;; Returns the values returned by BODY-FUNC.
+  (declare (optimize speed (safety 0))) ;; This function should be fast
+  (let* ((curr-span (make-span :parent-id (when parent
+                                            (span-span-id parent))
+                               :trace-id (if* parent
+                                            then (span-trace-id parent)
+                                            else (generate-trace-id component function))
+                               :span-id (generate-span-id component function)
+                               :service-name (arg-to-string component)
+                               :name (arg-to-string function)
+                               :key-values (mapcar #'arg-to-string key-values)
+                               :max-child-spans max-child-spans
+                               :flush-to-server-p flush-to-server-p
+                               :api-key api-key
+                               :dataset dataset))
+         (*current-span* curr-span)
+         (local-root-p (or (null parent)
+                           (span-proxy-for-remote-span-p parent))))
     (when parent
-      ;; Check child limit
-      (let ((max-childs (span-max-child-spans parent)))
-        (if* (and max-childs (<= (the fixnum max-childs) 0))
-           then ;; Child limit reached: don't create a new span
-                (return-from call-with-span
-                  (when func
-                    (funcall (the function func)))))))
-    (multiple-value-bind (api-key dataset)
-        (if* parent
-           then (values (span-api-key parent) (span-dataset parent))
-           else (let ((api-key %api-key%)
-                      (dataset %dataset%))
-                  (if* (or (null api-key) (null dataset))
-                     then (return-from call-with-span
-                            (when func
-                              (funcall (the function func))))
-                     else (values api-key dataset))))
-      (let* ((curr-span (make-span :parent-id (when parent
-                                                (span-span-id parent))
-                                   :trace-id (if* parent
-                                                then (span-trace-id parent)
-                                                else (generate-trace-id component function))
-                                   :span-id (generate-span-id component function)
-                                   :service-name component
-                                   :name function
-                                   :key-values key-values
-                                   :max-child-spans max-child-spans
-                                   :flush-to-server-p flush-to-server-p
-                                   :api-key api-key
-                                   :dataset dataset))
-             (*current-span* curr-span)
-             (local-root-p (or (null parent)
-                               (span-proxy-for-remote-span-p parent))))
-        (when parent
-          (push-atomic curr-span (span-child-spans parent))
-          (when (span-max-child-spans parent)
-            (decf (span-max-child-spans parent))))
-        (setf (span-start-time curr-span) (get-high-res-time))
-        (unwind-protect
-            (when func
-              (funcall (the function func)))
-          ;; Cleanup
-          (when func
-            (setf (span-end-time curr-span) (get-high-res-time)))
-          (when (or local-root-p ;; There's no parent, so it's now or never
-                    flush-to-server-p ;; User specified to flush now
-                    ;; Inside WITH-RESTORED-CONTEXT, parent already sent
-                    (and parent (span-sent-to-honeycomb-p parent)))
-            (post-span-hierarchy-to-honeycomb curr-span)))))))
+      (push-atomic curr-span (span-child-spans parent)))
+    (setf (span-start-time curr-span) (get-high-res-time))
+    (unwind-protect
+        (when body-func
+          (funcall (the function body-func)))
+      ;; Cleanup
+      (when body-func
+        (setf (span-end-time curr-span) (get-high-res-time)))
+      (when (or local-root-p ;; There's no parent, so it's now or never
+                flush-to-server-p ;; User specified to flush now
+                ;; Inside WITH-RESTORED-CONTEXT, parent already sent
+                (and parent (span-sent-to-honeycomb-p parent)))
+        (post-span-hierarchy-to-honeycomb curr-span)))))
 
 ;; Assumption by GET-CURRENT-TIME-MILLIS
 (assert (= internal-time-units-per-second 1000))
@@ -330,7 +343,10 @@ v0: initial release of cl-honeycomb implementation."
   (loop for span = (mp:dequeue *post-span-queue*
                                :wait t
                                :whostate "Waiting for span to send to Honeycomb")
-      do (do-post-span-hierarchy-to-honeycomb span)))
+      do (handler-case
+             (do-post-span-hierarchy-to-honeycomb span)
+           (error (e)
+             (warn "Posting to Honeycomb failed: ~a ~a" (type-of e) e)))))
 
 (defun post-span-hierarchy-to-honeycomb (span)
   (when (not *post-to-honeycomb-p*)
