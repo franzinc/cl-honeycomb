@@ -137,21 +137,29 @@ v0: initial release of cl-honeycomb implementation."
 
 (defun get-serialized-context (&optional (span *current-span*))
   (or (when span ;; Be robust against having being called outside of WITH-SPAN
-        (let ((api-key %api-key%)
+        (let ((span-id (span-span-id span))
               (trace-id (span-trace-id span))
-              (span-id (span-span-id span))
+              (api-key %api-key%)
+              (dataset %dataset%)
               (max-child-spans (span-max-child-spans span)))
-          (when (and %api-key% trace-id span-id)
+          (when (and span-id trace-id api-key dataset)
             ;; Sanity check. The primary use case is to send this
             ;; over HTTP, so this does not have to be super optimized.
-            (check-type api-key string)
-            (check-type trace-id string)
             (check-type span-id string)
+            (check-type trace-id string)
+            (check-type api-key string)
+            (check-type dataset string)
             (check-type max-child-spans (or null fixnum))
-            (assert (and (plusp (length api-key)) (plusp (length trace-id)) (plusp (length span-id))))
+            (assert (and (plusp (length span-id))
+                         (plusp (length trace-id))
+                         (plusp (length api-key))
+                         (plusp (length dataset))))
             (with-output-to-string (s)
-              (write `(:honeycomb :span-id ,span-id :trace-id ,trace-id :api-key ,api-key :max-child-spans ,max-child-spans)
-                     :stream s)))))
+              (with-standard-io-syntax
+                (write `(:honeycomb :span-id ,span-id :trace-id ,trace-id
+                                    :api-key ,api-key :dataset ,dataset
+                                    :max-child-spans ,max-child-spans)
+                       :stream s))))))
       ""))
 
 (defmacro with-restored-serialized-context ((str) &body body)
@@ -165,27 +173,33 @@ v0: initial release of cl-honeycomb implementation."
   (check-type string string)
   (if* (string= string "")
      then (funcall func)
-     else (let* ((*read-eval* nil)
-                 (state (read-from-string string)))
+     else (let ((state (with-standard-io-syntax
+                         (let ((*read-eval* nil))
+                           (read-from-string string)))))
             (check-type state (cons (eql :honeycomb)))
-            (destructuring-bind (&key span-id trace-id api-key max-child-spans)
+            (destructuring-bind (&key span-id trace-id api-key dataset max-child-spans)
                 (cdr state)
               ;; Sanity check. The primary use case is to receive this
-              ;; over HTTP, so this does not have to be super optimized,
-              (check-type api-key string)
-              (check-type trace-id string)
+              ;; over HTTP, so this does not have to be super optimized.
               (check-type span-id string)
-              (assert (and (plusp (length api-key)) (plusp (length trace-id)) (plusp (length span-id))))
+              (check-type trace-id string)
+              (check-type api-key string)
+              (check-type dataset string)
+              (assert (and (plusp (length span-id))
+                           (plusp (length trace-id))
+                           (plusp (length api-key))
+                           (plusp (length dataset))))
               (check-type max-child-spans (or null fixnum))
               (let* ((*local-api-key* api-key)
-                     (*current-span* (make-span :trace-id trace-id
-                                                :span-id span-id
+                     (*current-span* (make-span :span-id span-id
+                                                :trace-id trace-id
+                                                :api-key api-key
+                                                :dataset dataset
                                                 :max-child-spans max-child-spans
                                                 ;; Ensure this is sent to Honeycomb after span ends;
                                                 ;; the real root span is somewhere external and won't
                                                 ;; know about this child span.
-                                                :proxy-for-remote-span-p t
-                                                :api-key api-key)))
+                                                :proxy-for-remote-span-p t)))
                 (funcall func))))))
 ;;;
 

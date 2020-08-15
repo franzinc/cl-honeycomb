@@ -180,6 +180,7 @@ Syntax:
       ...
       (with-restored-context ()
         ...))
+
 A `with-span` form will automatically end up as child annotation of a
 dynamically enclosing `with-span`. This is implemented using dynamic
 variables. These variables are bound per thread. That means in a
@@ -188,7 +189,7 @@ In the Honeycomb interface the spans of different processes end
 up in distinct trees.
 
 To resolve this, use the macro `with-saved-context`
-and lexicaly inside its body use `with-restored-context`.
+and lexically inside its body use `with-restored-context`.
 For example:
 
     (defun handler (..)
@@ -199,6 +200,9 @@ For example:
          (with-restored-context ()
            (with-span (..)
              ..)))
+
+This can be used even if the calls to `with-saved-context` and
+`with-restored-context` are done from within different processes.
 
 ## Macros `with-saved-serialized-context`, `with-restored-serialized-context`
 Syntax:
