@@ -220,8 +220,12 @@ v0: initial release of cl-honeycomb implementation."
                                              ,gapi-key
                                              ,gdataset
                                              ,gparent))
-                      else (when ,gbody-func
-                             (funcall (the function ,gbody-func))))))))
+                      else ;; Hide *current-span* so that if BODY contains calls
+                           ;; to ADD-SPAN-ATTRIBUTES, those attributes do not
+                           ;; end up in a parent span.
+                           (when ,gbody-func
+                             (let ((*current-span* nil))
+                               (funcall (the function ,gbody-func)))))))))
      else `(progn ,@body)))
 
 (defun add-span-p ()
@@ -238,8 +242,8 @@ v0: initial release of cl-honeycomb implementation."
               (if* (plusp (the fixnum (span-max-child-spans parent)))
                  then (decf (the fixnum (span-max-child-spans parent)))
                  else (return-from add-span-p nil)))
-         else (setf api-key %api-key%
-                    dataset %dataset%))
+       else (setf api-key %api-key%
+                  dataset %dataset%))
     (values (and dataset api-key)
             dataset
             parent)))
@@ -247,10 +251,11 @@ v0: initial release of cl-honeycomb implementation."
 (defmacro add-span-attributes (&rest kv-args)
   (if* *include-honeycomb-code-p*
      then `(when (honeycomb-enabled-p)
-             (setf (span-key-values (or *current-span*
-                                        (error "ADD-SPAN-ATTRIBUTES must be called inside WITH-SPAN")))
-               (nconc (mapcar #'arg-to-string (list ,@kv-args))
-                      (span-key-values *current-span*))))
+             (let ((cs *current-span*))
+               (when cs
+                 (setf (span-key-values cs)
+                   (nconc (mapcar #'arg-to-string (list ,@kv-args))
+                          (span-key-values cs))))))
      else ()))
 
 (defun arg-to-string (x)
