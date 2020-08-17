@@ -1,7 +1,8 @@
 ;; See the file LICENSE for the full license governing this code.
 
-(sys:defpatch "cl-honeycomb" 2
-  "v2: fix call-with-span return value; ensure post-process is started;
+(sys:defpatch "cl-honeycomb" 3
+  "v3: fix adding attributes; include dataset in serialized context;
+v2: fix call-with-span return value; ensure post-process is started;
 v1: set User-Agent in request to api.honeycomb.io;
 v0: initial release of cl-honeycomb implementation."
    :type :system
