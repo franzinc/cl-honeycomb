@@ -269,8 +269,9 @@ v0: initial release of cl-honeycomb implementation."
              (let ((cs *current-span*))
                (when cs
                  (setf (span-key-values cs)
-                   (nconc (mapcar #'arg-to-string (list ,@kv-args))
-                          (span-key-values cs))))))
+                   (with-standard-io-syntax
+                     (nconc (mapcar #'arg-to-string (list ,@kv-args))
+                            (span-key-values cs)))))))
      else ()))
 
 (defun arg-to-string (x)
@@ -278,7 +279,7 @@ v0: initial release of cl-honeycomb implementation."
   (typecase x
     (symbol (symbol-name x))
     (string x)
-    (t (prin1-to-string x))))
+    (t (princ-to-string x))))
 
 (defun call-with-span (component function key-values body-func max-child-spans flush-to-server-p
                        api-key dataset parent)
@@ -293,7 +294,8 @@ v0: initial release of cl-honeycomb implementation."
                                :span-id (generate-span-id component function)
                                :service-name (arg-to-string component)
                                :name (arg-to-string function)
-                               :key-values (mapcar #'arg-to-string key-values)
+                               :key-values (with-standard-io-syntax
+                                             (mapcar #'arg-to-string key-values))
                                :max-child-spans max-child-spans
                                :flush-to-server-p flush-to-server-p
                                :api-key api-key
