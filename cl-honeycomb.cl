@@ -1,7 +1,8 @@
 ;; See the file LICENSE for the full license governing this code.
 
-(sys:defpatch "cl-honeycomb" 3
-  "v3: fix adding attributes; include dataset in serialized context;
+(sys:defpatch "cl-honeycomb" 4
+  "v4: define with-restored-context even if honeycomb code not used
+v3: fix adding attributes; include dataset in serialized context;
 v2: fix call-with-span return value; ensure post-process is started;
 v1: set User-Agent in request to api.honeycomb.io;
 v0: initial release of cl-honeycomb implementation."
@@ -125,7 +126,9 @@ v0: initial release of cl-honeycomb implementation."
                             `(let ((*current-span* ,',g))
                                ,@inner-body)))
                  ,@body)))
-     else `(progn ,@body)))
+     else `(macrolet ((with-restored-context (() &body inner-body)
+                        `(progn ,@inner-body)))
+             ,@body)))
 
 ;;; Serialized state, e.g. to send to other processes over HTTP
 
