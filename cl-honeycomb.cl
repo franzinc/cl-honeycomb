@@ -174,8 +174,8 @@ v0: initial release of cl-honeycomb implementation."
 
 (defun call-with-restored-serialized-context (string func)
   (declare (dynamic-extent func))
-  (check-type string string)
-  (if* (string= string "")
+  ;; Be robust against STRING being NIL or other bogus values
+  (if* (not (and (stringp string) (plusp (length (the string string)))))
      then (funcall func)
      else (let ((state (with-standard-io-syntax
                          (let ((*read-eval* nil))
