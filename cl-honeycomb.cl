@@ -217,7 +217,7 @@ v0: initial release of cl-honeycomb implementation."
   ;; Returns the values returned by BODY.
   (if* *include-honeycomb-code-p*
      then (setf kv-args (copy-list kv-args))
-          (destructuring-bind (&key max-child-spans flush-to-server-p &allow-other-keys)
+          (destructuring-bind (&key max-child-spans flush-to-server-p post-directly-p &allow-other-keys)
               kv-args
             (when max-child-spans
               (check-type max-child-spans (integer 0 #.most-positive-fixnum)))
@@ -235,6 +235,7 @@ v0: initial release of cl-honeycomb implementation."
                                              ,gbody-func
                                              ,max-child-spans
                                              ,flush-to-server-p
+                                             ,post-directly-p
                                              ,gapi-key
                                              ,gdataset
                                              ,gparent))
@@ -284,7 +285,8 @@ v0: initial release of cl-honeycomb implementation."
     (string x)
     (t (princ-to-string x))))
 
-(defun call-with-span (component function key-values body-func max-child-spans flush-to-server-p
+(defun call-with-span (component function key-values body-func
+                       max-child-spans flush-to-server-p post-directly-p
                        api-key dataset parent)
   ;; BODY-FUNC is nil for no body.
   ;; Returns the values returned by BODY-FUNC.
@@ -319,7 +321,9 @@ v0: initial release of cl-honeycomb implementation."
                 flush-to-server-p ;; User specified to flush now
                 ;; Inside WITH-RESTORED-CONTEXT, parent already sent
                 (and parent (span-sent-to-honeycomb-p parent)))
-        (post-span-hierarchy-to-honeycomb curr-span)))))
+        (if post-directly-p
+            (do-post-span-hierarchy-to-honeycomb curr-span)
+          (post-span-hierarchy-to-honeycomb curr-span))))))
 
 ;; Assumption by GET-CURRENT-TIME-MILLIS
 (assert (= internal-time-units-per-second 1000))
