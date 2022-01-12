@@ -2,4 +2,4 @@ default:
 	echo no default rule
 
 clean:
-	rm *.fasl
+	rm -f *.fasl
